@@ -40,9 +40,9 @@ Poetry, Docker Compose, pytest, black, flake8, mypy, GitHub Actions. Для ро
    docker compose up --build
    ```
    Контейнер `web` сам застосує міграції (`alembic upgrade head`), створить групи користувачів і запустить сервер.
-3. Створи демонстраційні акаунти:
+3. Створи демонстраційні акаунти (докладніше в розділі «Демонстраційні дані»):
    ```
-   docker compose exec web python -m src.seed_demo
+   docker compose exec web python -m src.test_fixture
    ```
 
 | Що | Адреса |
@@ -52,9 +52,16 @@ Poetry, Docker Compose, pytest, black, flake8, mypy, GitHub Actions. Для ро
 | Пошта для розробки (MailHog) | http://localhost:8025 |
 | Консоль MinIO | http://localhost:9001 |
 
-### Вхід у документацію й демонстраційні акаунти
+### Вхід у документацію
 
-Сторінки документації закриті: браузер запитає **пошту й пароль** зареєстрованого активного користувача.
+Сторінки документації закриті: браузер запитає **пошту й пароль** зареєстрованого активного користувача
+(наприклад, демонстраційного, див. нижче). Щоб виконувати захищені запити зі Swagger UI, викличи
+`POST /accounts/login/`, натисни **Authorize** і встав `access_token`.
+
+## Демонстраційні дані (фікстура)
+
+Скрипт `src/text_fixture.py` створює три готові до роботи акаунти, по одному на кожну роль. Вони вже активні, тож
+листа активації не потрібно. Каталог фільмів скрипт **не** наповнює: фільми створює модератор через `POST /movies/`.
 
 | Роль | Пошта | Пароль |
 |---|---|---|
@@ -62,9 +69,46 @@ Poetry, Docker Compose, pytest, black, flake8, mypy, GitHub Actions. Для ро
 | Модератор | demo.moderator@example.com | Demo1234! |
 | Адміністратор | demo.admin@example.com | Demo1234! |
 
-Пароль за замовчуванням призначений лише для локальної перевірки. Щоб задати інший, запусти скрипт зі змінною
-`DEMO_PASSWORD` (скрипт можна запускати повторно). Щоб виконувати захищені запити зі Swagger UI, викличи
-`POST /accounts/login/`, натисни **Authorize** і встав `access_token`.
+**Запуск у Docker** (після `docker compose up`):
+
+```
+docker compose exec web python -m src.test_fixture
+```
+
+**Запуск без Docker.** Потрібні запущена база, правильний `DATABASE_URL` у `.env` і застосовані міграції:
+
+```
+poetry run alembic upgrade head
+poetry run python -m src.test_fixture
+```
+
+У консолі з'явиться список створених акаунтів.
+
+**Власний пароль.** Пароль за замовчуванням призначений лише для локальної перевірки. Задати інший можна змінною
+`DEMO_PASSWORD`:
+
+```
+docker compose exec -e DEMO_PASSWORD='MyStr0ng!Pass' web python -m src.test_fixture
+DEMO_PASSWORD='MyStr0ng!Pass' poetry run python -m src.test_fixture
+```
+
+Пароль має відповідати вимогам: від 8 символів, велика й мала літери, цифра та спецсимвол із `@ $ ! % * ? & #`.
+
+**Повторний запуск безпечний.** Дублів не буде: скрипт приводить акаунти до стану з таблиці вище (активні, у правильній
+групі) і **заново ставить пароль**. Так можна змінити пароль, наприклад, після перевірки. Пароль не варто зберігати
+в репозиторії, коли застосунок розгорнуто на сервері.
+
+**Почати з чистої бази.** `docker compose down -v` видаляє контейнери й **усі дані**, потім `docker compose up --build`
+і знову команда запуску.
+
+**Типові помилки:**
+
+| Повідомлення | Причина | Що робити |
+|---|---|---|
+| `password authentication failed for user "..."` або `role "..." does not exist` | ім'я чи пароль у `DATABASE_URL` не збігаються з `POSTGRES_USER` і `POSTGRES_PASSWORD` | виправ `.env` |
+| `Connect call failed` або `Connection refused` | база не запущена або вказано не той порт | `docker compose up -d db`, перевір порт у `DATABASE_URL` |
+| `relation "user_groups" does not exist` | таблиці ще не створені | `poetry run alembic upgrade head` (у Docker це робить контейнер `web` під час старту) |
+| `ValueError: Password must contain ...` | `DEMO_PASSWORD` надто простий | пароль за вимогами вище |
 
 ## Змінні оточення
 
@@ -170,7 +214,7 @@ Poetry, Docker Compose, pytest, black, flake8, mypy, GitHub Actions. Для ро
 │   ├── config.py              налаштування з .env
 │   ├── database.py            підключення до бази
 │   ├── celery_app.py, tasks.py   Celery: листи й періодичне очищення
-│   ├── seed.py, seed_demo.py  початкові дані: групи користувачів, демо-акаунти
+│   ├── test_fixture.py  початкові дані: групи користувачів, демо-акаунти
 │   ├── models/                моделі бази даних
 │   ├── schemas/               схеми запитів і відповідей
 │   ├── routes/                ендпоінти
@@ -188,7 +232,7 @@ Poetry, Docker Compose, pytest, black, flake8, mypy, GitHub Actions. Для ро
 ```
 poetry install
 alembic upgrade head          # потрібна запущена база з DATABASE_URL у .env
-python -m src.seed            # групи користувачів
+python -m src.test_fixture           # групи користувачів
 uvicorn src.main:app --reload
 ```
 
