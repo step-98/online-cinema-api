@@ -1,0 +1,5 @@
+[run]
+source = src
+# SQLAlchemy's async mode runs inside greenlets; without this, coverage loses track of
+# every line that runs after an "await" on the database and reports far too low numbers.
+concurrency = greenlet,thread
