@@ -1,0 +1,87 @@
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Code quality (black, flake8, mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: poetry
+
+      - name: Install dependencies
+        run: poetry install --no-root
+
+      - name: black
+        run: poetry run black --check .
+
+      - name: flake8
+        run: poetry run flake8 .
+
+      - name: mypy
+        run: poetry run mypy src
+
+  test:
+    name: Tests (pytest with coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: poetry
+
+      - name: Install dependencies
+        run: poetry install --no-root
+
+      - name: pytest
+        run: poetry run pytest --cov=src --cov-report=term-missing --cov-report=xml
+
+      - name: Keep the coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  deploy:
+    name: Deploy to AWS EC2
+    needs: [lint, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Deploy over SSH
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$EC2_SSH_KEY" > key.pem
+          ssh -i key.pem -o StrictHostKeyChecking=accept-new "$EC2_USER@$EC2_HOST" '
+            set -e
+            cd ~/online-cinema
+            git pull --ff-only origin main
+            docker compose up -d --build
+            docker compose ps
+          '
