@@ -17,7 +17,7 @@ services:
     <<: *app
     command: >
       sh -c "alembic upgrade head &&
-             python -m src.seed &&
+             python -m src.test_fixture --groups-only &&
              uvicorn src.main:app --host 0.0.0.0 --port 8000"
     ports:
       - "8000:8000"

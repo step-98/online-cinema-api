@@ -1,8 +1,5 @@
 import os
 
-# The settings must be in place BEFORE any src module is imported (src.database reads them at import).
-# They are assigned, not "set if missing", so a real .env can never leak in:
-# the tests never touch your development database and never use real Stripe keys.
 os.environ.update(
     {
         "DATABASE_URL": "sqlite+aiosqlite://",
@@ -29,10 +26,8 @@ from src.celery_app import celery_app  # noqa: E402
 from src.database import Base, get_db  # noqa: E402
 from src.main import app  # noqa: E402
 from src.models.accounts import UserGroupEnum, UserGroupModel, UserModel  # noqa: E402
-from src.seed import seed_user_groups  # noqa: E402
 from tests.helpers import mail_params, movie_payload  # noqa: E402
 
-# Celery tasks run right inside the request, so the tests can read the "sent" e-mails at once.
 celery_app.conf.task_always_eager = True
 celery_app.conf.task_eager_propagates = True
 
@@ -82,21 +77,6 @@ async def engine():
 @pytest_asyncio.fixture
 async def session_factory(engine):
     return async_sessionmaker(engine, expire_on_commit=False)
-
-
-@pytest_asyncio.fixture
-async def client(session_factory):
-    async with session_factory() as session:
-        await seed_user_groups(session)
-
-    async def override_get_db():
-        async with session_factory() as session:
-            yield session
-
-    app.dependency_overrides[get_db] = override_get_db
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
-        yield http
-    app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture
