@@ -124,15 +124,6 @@ DEMO_PASSWORD='MyStr0ng!Pass' poetry run python -m src.test_fixture
 **Почати з чистої бази.** `docker compose down -v` видаляє контейнери й **усі дані**, потім `docker compose up --build`
 і знову команда запуску.
 
-**Типові помилки:**
-
-| Повідомлення | Причина | Що робити |
-|---|---|---|
-| `password authentication failed for user "..."` або `role "..." does not exist` | ім'я чи пароль у `DATABASE_URL` не збігаються з `POSTGRES_USER` і `POSTGRES_PASSWORD` | виправ `.env` |
-| `Connect call failed` або `Connection refused` | база не запущена або вказано не той порт | `docker compose up -d db`, перевір порт у `DATABASE_URL` |
-| `relation "user_groups" does not exist` | таблиці ще не створені | `poetry run alembic upgrade head` (у Docker це робить контейнер `web` під час старту) |
-| `ValueError: Password must contain ...` | `DEMO_PASSWORD` надто простий | пароль за вимогами вище |
-
 ## Змінні оточення
 
 Приклад лежить у `.env.example`. Значення без «за замовчуванням» обов'язкові: без них застосунок не запуститься.
@@ -151,14 +142,6 @@ DEMO_PASSWORD='MyStr0ng!Pass' poetry run python -m src.test_fixture
 | `REDIS_URL` | брокер Celery; у Docker підставляється автоматично | `redis://localhost:6379/0` |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_FROM` | SMTP; у Docker це MailHog | `localhost`, `1025`, `no-reply@online-cinema.local` |
 | `ACTIVATION_URL`, `PASSWORD_RESET_URL` | сторінки, на які ведуть посилання з листів (додаються `?email=...&token=...`) | `http://localhost:8000/docs` |
-
-## Перевірка оплати (Stripe, тестовий режим)
-
-1. У `.env` вкажи тестовий `STRIPE_SECRET_KEY`.
-2. Запусти пересилання вебхуків: `stripe listen --forward-to localhost:8000/payments/webhook/`. Команда виведе
-   `whsec_...`, це значення для `STRIPE_WEBHOOK_SECRET`. Після зміни `.env` перезапусти контейнери.
-3. Створи замовлення, викличи `POST /payments/orders/{order_id}/checkout/` і відкрий отриманий `checkout_url`.
-4. Оплати тестовою карткою `4242 4242 4242 4242` (будь-яка майбутня дата й CVC). Замовлення стане `paid`.
 
 ## API
 
