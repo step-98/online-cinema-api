@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str
     STRIPE_WEBHOOK_SECRET: str
     STRIPE_CURRENCY: str = "usd"
-    # Where Stripe sends the user after paying or leaving the payment page.
+
     PAYMENT_SUCCESS_URL: str = "http://localhost:8000/docs"
     PAYMENT_CANCEL_URL: str = "http://localhost:8000/docs"
 

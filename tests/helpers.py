@@ -35,13 +35,11 @@ def movie_payload(
 
 
 def mail_params(mail: dict) -> dict:
-    """Query parameters (token, email) of the link inside an e-mail."""
     link = re.search(r"http\S+", mail["body"]).group(0)
     return parse_qs(urlparse(link).query)
 
 
 def signed_webhook(event: dict, secret: str = WEBHOOK_SECRET, age_seconds: int = 0) -> dict:
-    """Arguments for client.post(): the body and the signature header, made the way Stripe makes them."""
     payload = json.dumps(event).encode()
     timestamp = int(time.time()) - age_seconds
     signature = hmac.new(secret.encode(), f"{timestamp}.".encode() + payload, hashlib.sha256).hexdigest()

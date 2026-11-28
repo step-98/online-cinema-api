@@ -312,7 +312,7 @@ async def change_password(
         )
 
     try:
-        user.password = data.new_password  # validated and hashed by the model
+        user.password = data.new_password
         await db.commit()
     except SQLAlchemyError as error:
         await db.rollback()

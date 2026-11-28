@@ -8,7 +8,6 @@ from src.exceptions import InvalidTokenError, TokenExpiredError
 
 
 class JWTAuthManager:
-    """Creates and decodes JWT access and refresh tokens."""
 
     def __init__(
         self,

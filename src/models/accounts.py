@@ -71,12 +71,6 @@ class UserModel(Base):
 
     @classmethod
     def create(cls, email: str, raw_password: str, group_id: int | Mapped[int]) -> "UserModel":
-        """
-        Factory method to create a new UserModel instance.
-
-        This method simplifies the creation of a new user by handling
-        password hashing and setting required attributes.
-        """
         user = cls(email=email, group_id=group_id)
         user.password = raw_password
         return user
@@ -87,16 +81,10 @@ class UserModel(Base):
 
     @password.setter
     def password(self, raw_password: str) -> None:
-        """
-        Set the user's password after validating its strength and hashing it.
-        """
         validators.validate_password_strength(raw_password)
         self._hashed_password = hash_password(raw_password)
 
     def verify_password(self, raw_password: str) -> bool:
-        """
-        Verify the provided password against the stored hashed password.
-        """
         return verify_password(raw_password, self._hashed_password)
 
     @validates("email")
@@ -169,13 +157,6 @@ class RefreshTokenModel(TokenBaseModel):
 
     @classmethod
     def create(cls, user_id: int | Mapped[int], days_valid: int, token: str) -> "RefreshTokenModel":
-        """
-        Factory method to create a new RefreshTokenModel instance.
-
-        This method simplifies the creation of a new refresh token by calculating
-        the expiration date based on the provided number of valid days and setting
-        the required attributes.
-        """
         expires_at = datetime.now(timezone.utc) + timedelta(days=days_valid)
         return cls(user_id=user_id, expires_at=expires_at, token=token)
 

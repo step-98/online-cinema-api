@@ -5,10 +5,18 @@ os.environ.update(
         "DATABASE_URL": "sqlite+aiosqlite://",
         "SECRET_KEY_ACCESS": "test-access-secret-key-0123456789abcdef",
         "SECRET_KEY_REFRESH": "test-refresh-secret-key-0123456789abcdef",
-        "STRIPE_SECRET_KEY": "sk_test_dummy",
+        "STRIPE_SECRET_KEY": "sk_test",
         "STRIPE_WEBHOOK_SECRET": "whsec_test",
         "STRIPE_CURRENCY": "usd",
     }
+)
+
+from src.config import get_settings  # noqa: E402
+
+_database_kind = get_settings().DATABASE_URL.split(":")[0]
+assert _database_kind.startswith("sqlite"), (
+    f"The tests must run on the in-memory SQLite database, but the settings point to '{_database_kind}'. "
+    "src.config was imported before tests/conftest.py set the test settings."
 )
 
 from dataclasses import dataclass  # noqa: E402
@@ -17,7 +25,7 @@ from types import SimpleNamespace  # noqa: E402
 import httpx  # noqa: E402
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
-from sqlalchemy import event, select, update  # noqa: E402
+from sqlalchemy import event, func, select, update  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
@@ -26,6 +34,7 @@ from src.celery_app import celery_app  # noqa: E402
 from src.database import Base, get_db  # noqa: E402
 from src.main import app  # noqa: E402
 from src.models.accounts import UserGroupEnum, UserGroupModel, UserModel  # noqa: E402
+from src.test_fixture import seed_user_groups  # noqa: E402
 from tests.helpers import mail_params, movie_payload  # noqa: E402
 
 celery_app.conf.task_always_eager = True
@@ -49,7 +58,6 @@ class UserInfo:
 
 @pytest.fixture(autouse=True)
 def outbox(monkeypatch):
-    """Every e-mail the app sends ends up in this list instead of an SMTP server."""
     sent: list[dict] = []
     monkeypatch.setattr(
         "src.tasks.send_email",
@@ -77,6 +85,26 @@ async def engine():
 @pytest_asyncio.fixture
 async def session_factory(engine):
     return async_sessionmaker(engine, expire_on_commit=False)
+
+
+@pytest_asyncio.fixture
+async def client(session_factory):
+    async with session_factory() as session:
+        await seed_user_groups(session)
+        groups_created = await session.scalar(select(func.count()).select_from(UserGroupModel))
+    assert groups_created == len(UserGroupEnum), (
+        f"Expected {len(UserGroupEnum)} user groups after seed_user_groups(), found {groups_created}. "
+        "Check seed_user_groups in src/test_fixture.py and the import in tests/conftest.py."
+    )
+
+    async def override_get_db():
+        async with session_factory() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
+        yield http
+    app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture
@@ -124,7 +152,6 @@ async def admin(make_user):
 
 @pytest_asyncio.fixture
 async def catalog(client, moderator):
-    """Three movies; returns {name: id}."""
     movies = [
         movie_payload(
             "Heat",
@@ -167,7 +194,6 @@ async def catalog(client, moderator):
 
 @pytest.fixture
 def stripe_mock(monkeypatch):
-    """Stripe is never called for real: checkout and refund are replaced, and their calls are recorded."""
     calls = {"checkout": [], "refund": []}
 
     async def fake_checkout(settings, order):
@@ -184,7 +210,6 @@ def stripe_mock(monkeypatch):
 
 @pytest_asyncio.fixture
 async def pending_order(client, user, catalog):
-    """A pending order of Heat (9.99) and Ronin (5.00): total 14.99."""
     for name in ("Heat", "Ronin"):
         r = await client.post(f"/cart/movies/{catalog[name]}/", headers=user.headers)
         assert r.status_code == 201, r.text

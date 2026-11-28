@@ -143,7 +143,7 @@ async def _handle_paid(db: AsyncSession, session: dict) -> None:
     if order_id is None:
         return
     external_id = session.get("payment_intent") or session["id"]
-    if await _already_recorded(db, external_id):  # Stripe may deliver an event twice
+    if await _already_recorded(db, external_id):
         return
 
     order = await _load_order(db, order_id)
