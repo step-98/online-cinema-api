@@ -30,8 +30,7 @@ Poetry, Docker Compose, pytest, black, flake8, mypy, GitHub Actions. Для ро
 
 Потрібен запущений Docker Desktop.
 
-1. Скопіюй `.env.example` у `.env` і заповни значення (список змінних нижче). Секрети для JWT можна згенерувати так
-   (виконай двічі, для двох ключів):
+1. Скопіюй `.env.example` у `.env` і заповни обов'язкові значення (див. «Змінні оточення»). Ключі JWT згенеруй двічі:
    ```
    python -c "import secrets; print(secrets.token_urlsafe(48))"
    ```
@@ -39,11 +38,12 @@ Poetry, Docker Compose, pytest, black, flake8, mypy, GitHub Actions. Для ро
    ```
    docker compose up --build
    ```
-   Контейнер `web` сам застосує міграції (`alembic upgrade head`), створить групи користувачів і запустить сервер.
-3. Створи демонстраційні акаунти (докладніше в розділі «Демонстраційні дані»):
+   Контейнер `web` сам застосує міграції, створить групи користувачів і запустить сервер.
+3. Створи демонстраційні акаунти й каталог:
    ```
    docker compose exec web python -m src.test_fixture
    ```
+4. Відкрий http://localhost:8000/docs і увійди демо-акаунтом із таблиці нижче.
 
 | Що | Адреса |
 |---|---|
@@ -54,17 +54,15 @@ Poetry, Docker Compose, pytest, black, flake8, mypy, GitHub Actions. Для ро
 
 ### Вхід у документацію
 
-Сторінки документації закриті: браузер запитає **пошту й пароль** зареєстрованого активного користувача
-(наприклад, демонстраційного, див. нижче). Щоб виконувати захищені запити зі Swagger UI, викличи
-`POST /accounts/login/`, натисни **Authorize** і встав `access_token`.
+Документація закрита за вимогою завдання: браузер запитає **пошту й пароль** зареєстрованого активного користувача.
+Щоб виконувати захищені запити зі Swagger UI, викличи `POST /accounts/login/`, натисни **Authorize** і встав
+`access_token`. Якщо замість вікна входу видно лише `{"detail":"Not authenticated"}`, онови сторінку або відкрий
+адресу в приватному вікні: браузер запам'ятовує скасований вхід.
 
-## Демонстраційні дані (фікстура)
+## Демонстраційні дані
 
-Скрипт `src/test_fixture.py` створює:
-
-- три готові до роботи **акаунти**, по одному на кожну роль. Вони вже активні, тож листа активації не потрібно;
-- **каталог із 10 фільмів** (разом із жанрами, акторами, режисерами й сертифікаціями), на якому видно всі функції
-  каталогу. Назви, роки, тривалість і режисери справжні, а оцінки, кількість голосів і ціни умовні.
+Скрипт `src/test_fixture.py` створює три активні акаунти (по одному на роль) і каталог із 10 фільмів із жанрами,
+акторами й режисерами. Назви, роки, тривалість і режисери справжні, а оцінки, кількість голосів і ціни умовні.
 
 | Роль | Пошта | Пароль |
 |---|---|---|
@@ -72,26 +70,16 @@ Poetry, Docker Compose, pytest, black, flake8, mypy, GitHub Actions. Для ро
 | Модератор | demo.moderator@example.com | Demo1234! |
 | Адміністратор | demo.admin@example.com | Demo1234! |
 
-Скрипт має два режими: без параметрів він створює все перелічене (разом із групами користувачів), а з
-`--groups-only` лише групи користувачів, без яких застосунок не вміє реєструвати людей. У другому режимі його
-сам запускає контейнер `web` під час старту.
+- Без параметрів скрипт створює все (разом із групами користувачів). З `--groups-only` він створює лише групи,
+  без яких не можна реєструвати людей: так його запускає контейнер `web` під час старту.
+- Без Docker: `poetry run alembic upgrade head`, потім `poetry run python -m src.test_fixture`.
+- Власний пароль: `docker compose exec -e DEMO_PASSWORD='MyStr0ng!Pass' web python -m src.test_fixture`
+  (від 8 символів, велика й мала літери, цифра, спецсимвол із `@ $ ! % * ? & #`).
+- Повторний запуск безпечний: дублів не буде, пароль ставиться заново, наявні фільми не змінюються.
+  Почати з чистої бази: `docker compose down -v` (видаляє **всі** дані), потім `docker compose up --build`.
 
-**Запуск у Docker** (після `docker compose up`):
-
-```
-docker compose exec web python -m src.test_fixture
-```
-
-**Запуск без Docker.** Потрібні запущена база, правильний `DATABASE_URL` у `.env` і застосовані міграції:
-
-```
-poetry run alembic upgrade head
-poetry run python -m src.test_fixture
-```
-
-У консолі з'явиться список створених акаунтів.
-
-**Що спробувати на демо-каталозі** (запити до `GET /movies/`):
+<details>
+<summary>Що спробувати на демо-каталозі (запити до <code>GET /movies/</code>)</summary>
 
 | Запит | Що має вийти |
 |---|---|
@@ -100,114 +88,49 @@ poetry run python -m src.test_fixture
 | `q=nolan` | 2 фільми (пошук за режисером): The Dark Knight, Inception |
 | `imdb_min=9` | 3 фільми: The Shawshank Redemption, The Godfather, The Dark Knight |
 | `sort_by=price&order=desc` | першим Inception (12.99), потім The Dark Knight (11.99) |
-| `sort_by=popularity&order=desc` | першим The Shawshank Redemption |
-| `GET /genres/` | жанри з кількістю фільмів: Drama (6), Crime (4), Action (3) та інші; потім `GET /movies/?genre_id=...` |
+| `GET /genres/` | жанри з кількістю фільмів: Drama (6), Crime (4), Action (3) та інші |
+
+</details>
 
 Решту функцій (лайки, оцінки, улюблені, коментарі, кошик, замовлення, оплата) перевіряє той, хто тестує, від імені
 демонстраційного користувача.
 
-**Власний пароль.** Пароль за замовчуванням призначений лише для локальної перевірки. Задати інший можна змінною
-`DEMO_PASSWORD`:
+## Перевірка оплати (Stripe, тестовий режим)
 
-```
-docker compose exec -e DEMO_PASSWORD='MyStr0ng!Pass' web python -m src.test_fixture
-DEMO_PASSWORD='MyStr0ng!Pass' poetry run python -m src.test_fixture
-```
-
-Пароль має відповідати вимогам: від 8 символів, велика й мала літери, цифра та спецсимвол із `@ $ ! % * ? & #`.
-
-**Повторний запуск безпечний.** Дублів не буде: скрипт приводить акаунти до стану з таблиці вище (активні, у правильній
-групі) і **заново ставить пароль** (так можна змінити пароль, наприклад, після перевірки), а фільми, що вже є в каталозі,
-не чіпає (навіть якщо модератор їх змінив). Пароль не варто зберігати
-в репозиторії, коли застосунок розгорнуто на сервері.
-
-**Почати з чистої бази.** `docker compose down -v` видаляє контейнери й **усі дані**, потім `docker compose up --build`
-і знову команда запуску.
+1. У `.env` вкажи тестовий `STRIPE_SECRET_KEY`.
+2. `stripe listen --forward-to localhost:8000/payments/webhook/`: команда виведе `whsec_...`, це значення для
+   `STRIPE_WEBHOOK_SECRET`. Після зміни `.env` перезапусти контейнери.
+3. Створи замовлення, викличи `POST /payments/orders/{order_id}/checkout/` і відкрий отриманий `checkout_url`.
+4. Оплати карткою `4242 4242 4242 4242` (будь-яка майбутня дата й CVC): замовлення стане `paid`.
 
 ## Змінні оточення
 
-Приклад лежить у `.env.example`. Значення без «за замовчуванням» обов'язкові: без них застосунок не запуститься.
+Приклад лежить у `.env.example`. Без цих значень застосунок не запуститься:
 
-| Змінна | Призначення | За замовчуванням |
-|---|---|---|
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | база даних (для Docker Compose) | немає |
-| `DATABASE_URL` | рядок підключення (`postgresql+asyncpg://...`); у Docker підставляється автоматично | немає |
-| `SECRET_KEY_ACCESS`, `SECRET_KEY_REFRESH` | ключі підпису access- і refresh-токенів (різні, від 32 символів) | немає |
-| `JWT_SIGNING_ALGORITHM` | алгоритм підпису | `HS256` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | термін життя access-токена | `15` |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | термін життя refresh-токена | `7` |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ключі Stripe | немає |
-| `STRIPE_CURRENCY` | валюта платежів | `usd` |
-| `PAYMENT_SUCCESS_URL`, `PAYMENT_CANCEL_URL` | куди Stripe повертає користувача | `http://localhost:8000/docs` |
-| `REDIS_URL` | брокер Celery; у Docker підставляється автоматично | `redis://localhost:6379/0` |
-| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_FROM` | SMTP; у Docker це MailHog | `localhost`, `1025`, `no-reply@online-cinema.local` |
-| `ACTIVATION_URL`, `PASSWORD_RESET_URL` | сторінки, на які ведуть посилання з листів (додаються `?email=...&token=...`) | `http://localhost:8000/docs` |
+| Змінна | Призначення |
+|---|---|
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | база даних для Docker Compose |
+| `DATABASE_URL` | рядок підключення (`postgresql+asyncpg://...`); у Docker підставляється автоматично, потрібен лише для запуску без Docker |
+| `SECRET_KEY_ACCESS`, `SECRET_KEY_REFRESH` | ключі підпису токенів (різні, від 32 символів) |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ключі Stripe (щоб не перевіряти оплату, підійде будь-яке значення-заглушка) |
+
+Решта змінних має значення за замовчуванням (терміни життя токенів, валюта, адреси Redis і пошти, посилання з листів
+тощо). Повний перелік у `src/config.py`.
 
 ## API
 
-Повний опис із прикладами відкривається в Swagger UI. Коротко:
+Повний список запитів із прикладами відкривається в Swagger UI (`/docs`) після входу. Групи ендпоінтів:
 
-**Акаунти**
-
-| Запит | Опис |
+| Префікс | Що вміє |
 |---|---|
-| `POST /accounts/register/` | реєстрація, лист активації |
-| `POST /accounts/activate/` | активація за токеном із листа |
-| `POST /accounts/activate/resend/` | новий токен активації |
-| `POST /accounts/login/` | вхід, повертає access- і refresh-токени |
-| `POST /accounts/refresh/` | новий access-токен |
-| `POST /accounts/logout/` | відкликає refresh-токен |
-| `POST /accounts/change-password/` | зміна пароля за старим паролем |
-| `POST /accounts/password-reset/request/` | запит на скидання пароля |
-| `POST /accounts/password-reset/complete/` | новий пароль за токеном із листа |
-| `PATCH /admin/users/{user_id}/group/` | зміна групи користувача (адміністратор) |
-| `POST /admin/users/{user_id}/activate/` | ручна активація (адміністратор) |
-
-**Каталог**
-
-| Запит | Опис |
-|---|---|
-| `GET /movies/` | список: `page`, `per_page`, `year`, `imdb_min`, `genre_id`, `q`, `sort_by`, `order` |
-| `GET /movies/{movie_id}/` | деталі фільму |
-| `POST /movies/` | створити фільм (модератор) |
-| `PATCH /movies/{movie_id}/` | змінити фільм (модератор) |
-| `DELETE /movies/{movie_id}/` | видалити фільм (модератор) |
-| `PUT /movies/{movie_id}/like/` | лайк або дизлайк |
-| `DELETE /movies/{movie_id}/like/` | прибрати свою реакцію |
-| `PUT /movies/{movie_id}/rating/` | оцінка від 1 до 10 |
-| `GET /movies/{movie_id}/stats/` | лайки, дизлайки, середня оцінка |
-| `POST /movies/{movie_id}/favorite/` | додати в улюблені |
-| `DELETE /movies/{movie_id}/favorite/` | прибрати з улюблених |
-| `GET /movies/favorites/` | улюблені з тими самими фільтрами, що й каталог |
-| `GET /movies/{movie_id}/comments/` | коментарі до фільму |
-| `POST /movies/{movie_id}/comments/` | написати коментар або відповідь (`parent_id`) |
-| `POST /comments/{comment_id}/like/` | лайк коментаря |
-| `DELETE /comments/{comment_id}/like/` | прибрати лайк коментаря |
-| `GET /notifications/` | мої сповіщення |
-| `POST /notifications/{notification_id}/read/` | позначити сповіщення прочитаним |
-| `GET /genres/` | жанри з кількістю фільмів |
-| `GET /stars/` | актори |
-
-Жанри й актори (`/genres/`, `/stars/`) створюють, перейменовують і видаляють модератори.
-
-**Кошик, замовлення, платежі**
-
-| Запит | Опис |
-|---|---|
-| `GET /cart/` | мій кошик |
-| `POST /cart/movies/{movie_id}/` | додати фільм |
-| `DELETE /cart/movies/{movie_id}/` | прибрати фільм |
-| `DELETE /cart/` | очистити кошик |
-| `GET /cart/users/{user_id}/` | кошик користувача (модератор) |
-| `POST /orders/` | оформити замовлення з кошика |
-| `GET /orders/` | мої замовлення |
-| `POST /orders/{order_id}/cancel/` | скасувати неоплачене замовлення |
-| `GET /orders/all/` | усі замовлення з фільтрами (модератор) |
-| `POST /payments/orders/{order_id}/checkout/` | посилання на оплату в Stripe |
-| `POST /payments/webhook/` | вебхук Stripe |
-| `GET /payments/` | моя історія платежів |
-| `GET /payments/all/` | усі платежі з фільтрами (модератор) |
-| `POST /payments/{payment_id}/refund/` | повернення коштів (модератор) |
+| `/accounts` | реєстрація, активація (і повторна), вхід, оновлення токена, вихід, зміна й скидання пароля |
+| `/admin` | зміна групи користувача, ручна активація (адміністратор) |
+| `/movies` | каталог (`page`, `per_page`, `year`, `imdb_min`, `genre_id`, `q`, `sort_by`, `order`), деталі, лайки, оцінки, улюблені, коментарі; створення, зміна й видалення (модератор) |
+| `/genres`, `/stars` | списки (жанри з кількістю фільмів); створення, перейменування, видалення (модератор) |
+| `/comments`, `/notifications` | лайки коментарів, сповіщення про відповіді й лайки |
+| `/cart` | кошик; кошик будь-якого користувача (модератор) |
+| `/orders` | замовлення з кошика, скасування; усі замовлення з фільтрами (модератор) |
+| `/payments` | оплата через Stripe Checkout, вебхук, історія платежів; усі платежі й повернення коштів (модератор) |
 
 ## Структура проєкту
 
@@ -239,16 +162,15 @@ DEMO_PASSWORD='MyStr0ng!Pass' poetry run python -m src.test_fixture
 poetry install
 alembic upgrade head          # потрібна запущена база з DATABASE_URL у .env
 python -m src.test_fixture --groups-only   # групи користувачів (потрібні для реєстрації)
-python -m src.test_fixture                 # демонстраційні акаунти й каталог (за потреби)
 uvicorn src.main:app --reload
 ```
 
 Нова міграція після зміни моделей: `alembic revision --autogenerate -m "опис"`.
 
-## Тести та якість коду
+## Тести
 
 ```
-poetry run pytest                                   # усі тести
+poetry run pytest                                       # усі тести
 poetry run pytest --cov=src --cov-report=term-missing   # із покриттям
 poetry run black --check .
 poetry run flake8 .
@@ -278,3 +200,4 @@ GitHub Actions (`.github/workflows/ci.yml`):
 - Вебхук Stripe перевіряє підпис і вік запиту, а повторна доставка події нічого не змінює.
 - Позиції замовлення зберігають ціну на момент замовлення (`price_at_order`).
 - Лист ставиться в чергу тільки після коміту, а недоступна черга не ламає реєстрацію чи вебхук.
+
