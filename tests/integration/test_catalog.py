@@ -72,7 +72,6 @@ async def test_likes_and_ratings(client, catalog, user, other_user):
     stats = (await client.put(f"/movies/{movie}/like/", json={"is_like": False}, headers=other_user.headers)).json()
     assert (stats["likes"], stats["dislikes"]) == (1, 1)
 
-    # one reaction per user: changing it does not add a second one
     stats = (await client.put(f"/movies/{movie}/like/", json={"is_like": False}, headers=user.headers)).json()
     assert (stats["likes"], stats["dislikes"]) == (0, 2)
 

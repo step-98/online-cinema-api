@@ -6,7 +6,7 @@ async def test_only_moderators_and_admins_can_create_movies(client, user, modera
     assert (await client.post("/movies/", json=movie_payload(), headers=user.headers)).status_code == 403
     assert (await client.post("/movies/", json=movie_payload(), headers=moderator.headers)).status_code == 201
     r = await client.post("/movies/", json=movie_payload("Ronin", 1998), headers=admin.headers)
-    assert r.status_code == 201  # an admin inherits the moderator's rights
+    assert r.status_code == 201
 
 
 async def test_only_admins_can_change_a_users_group(client, user, moderator, admin):
@@ -17,7 +17,6 @@ async def test_only_admins_can_change_a_users_group(client, user, moderator, adm
     assert (await client.patch(url, json=body, headers=moderator.headers)).status_code == 403
     assert (await client.patch(url, json=body, headers=admin.headers)).status_code == 200
 
-    # the promoted user can now do what a moderator does
     assert (await client.post("/movies/", json=movie_payload(), headers=user.headers)).status_code == 201
 
 

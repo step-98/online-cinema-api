@@ -32,7 +32,6 @@ async def test_an_order_is_pending_and_keeps_the_prices_of_that_moment(client, p
     assert pending_order["total_amount"] == "14.99"
     assert [(i["name"], i["price"]) for i in pending_order["items"]] == [("Heat", "9.99"), ("Ronin", "5.00")]
 
-    # a later price change must not touch an existing order
     await client.patch(f"/movies/{catalog['Heat']}/", json={"price": "99.00"}, headers=moderator.headers)
     mine = (await client.get("/orders/", headers=user.headers)).json()
     assert mine[0]["items"][0]["price"] == "9.99"

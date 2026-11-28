@@ -27,7 +27,6 @@ async def test_the_webhook_rejects_a_wrong_signature(client, pending_order):
 
 
 async def test_the_webhook_rejects_an_old_signed_request(client, pending_order, user):
-    """A captured request must not be replayable later, even though its signature is genuine."""
     event = paid_event(pending_order["id"], 1499)
 
     r = await client.post("/payments/webhook/", **signed_webhook(event, age_seconds=3600))
@@ -91,7 +90,6 @@ async def test_a_moderator_can_refund_a_payment(client, pending_order, user, mod
 async def test_replaying_a_payment_after_a_refund_does_not_revive_the_order(
     client, pending_order, user, moderator, stripe_mock
 ):
-    """Stripe may deliver an old event again, even after the money was returned."""
     event = paid_event(pending_order["id"], 1499, "pi_replayed")
     await client.post("/payments/webhook/", **signed_webhook(event))
     payment_id = (await client.get("/payments/", headers=user.headers)).json()[0]["id"]
